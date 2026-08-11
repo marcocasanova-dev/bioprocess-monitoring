@@ -2,20 +2,38 @@ from pathlib import Path
 
 import pandas as pd
 
+import threading
+
+import time
+
 
 class Biospectrometer:
     def __init__(self, data):
         self.data = data
         self.current_index = 0
+        self.thread = None
+        self.stop_event = threading.Event()
+        self.pause_event = threading.Event()
 
-    def start(self):
+    def _run_simulation(self):
+        while not self.stop_event.is_set():
+            time.sleep(0.5)
+            print(f"start_simulation is on in idx{self.current_index}")
+            self.current_index += 1
+
+    def start_simulation(self):
+        self.thread = threading.Thread(target=self._run_simulation)
+        self.thread.start()
         print("start")
 
-    def pause(self):
+    def pause_simulation(self):
         print("pause")
 
-    def resume(self):
+    def resume_simulation(self):
         print("resume")
+
+    def kill_simulation(self):
+        print("kill")
 
     def get_current_data(self):
         return self.current_index, self.data.loc[self.current_index]
@@ -39,7 +57,7 @@ def main():
     print(df.loc[3, 1002])
 
     bio_spectrometer = Biospectrometer(df)
-    bio_spectrometer.start()
+    bio_spectrometer.start_simulation()
     print("----------------------------------")
     print(bio_spectrometer.get_current_data())
 
