@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 from biospectrometer import Biospectrometer, read_csv_file
 
@@ -33,11 +33,14 @@ def stop():
 
 @app.post("/jump/{index}")
 def jump(index: int):
-    app.state.spectrometer.jump_to(index)
+    try:
+        app.state.spectrometer.jump_to(index)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return {"status": "jumping"}
 
 
 @app.get("/spectrum")
 def get_spectrum():
-    current_data = app.state.spectrometer.get_current_data()
-    return {"status": "running", "data": current_data}
+    index, current_data = app.state.spectrometer.get_current_data()
+    return {"status": "running", "index": index, "data": current_data.tolist()}
