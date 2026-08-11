@@ -17,17 +17,28 @@ document.querySelector("#jump-btn")!.addEventListener("click", async () => {
   });
 });
 
-async function main() {
+let plotted = false;
+
+async function renderSpectrumData() {
   const { data, error } = await client.GET("/spectrum");
   if (error || !data) {
     console.error(error);
     return;
   }
-  Plotly.newPlot("plot", [{ y: data?.data, type: "scatter" }], {
+
+  const trace = { y: data?.data, type: "scatter" };
+  const layout = {
     xaxis: { title: "Index (0-N)" },
-    yaxis: { title: "Abs" },
-  });
-  console.log(data, error);
+    yaxis: { title: "Abs", range: [-0.001, 0.08] },
+  };
+
+  if (!plotted) {
+    Plotly.newPlot("plot", [trace], layout);
+    plotted = true;
+  } else {
+    Plotly.react("plot", [trace], layout);
+  }
 }
 
-main();
+renderSpectrumData();
+setInterval(renderSpectrumData, 500);
