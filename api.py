@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 
 from biospectrometer import Biospectrometer, read_csv_file
 
@@ -29,3 +29,15 @@ def start():
 def stop():
     app.state.spectrometer.stop_simulation()
     return {"status": "stop"}
+
+
+@app.post("/jump/{index}")
+def jump(index: int):
+    app.state.spectrometer.jump_to(index)
+    return {"status": "jumping"}
+
+
+@app.get("/spectrum")
+def get_spectrum():
+    current_data = app.state.spectrometer.get_current_data()
+    return {"status": "running", "data": current_data}

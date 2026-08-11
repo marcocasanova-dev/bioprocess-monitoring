@@ -13,3 +13,5 @@ Docs at http://127.0.0.1:8000/docs
 curl -X POST http://127.0.0.1:8000/start
 
 curl -X POST http://127.0.0.1:8000/stop
+
+curl -X POST http://127.0.0.1:8000/jump/9999
