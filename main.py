@@ -13,6 +13,7 @@ class Biospectrometer:
         self.current_index = 0
         self.thread = None
         self.stop_event = threading.Event()
+        self.lock = threading.Lock()
 
     def _run_simulation(self):
         while True:
@@ -20,11 +21,12 @@ class Biospectrometer:
                 time.sleep(0.1)
             time.sleep(0.5)
             print(f"start_simulation INDEX --> {self.current_index}")
-            self.current_index += 1
+            with self.lock:
+                self.current_index = (self.current_index + 1) % len(self.data)
 
     def start_simulation(self):
         if self.thread is None:
-            self.thread = threading.Thread(target=self._run_simulation)
+            self.thread = threading.Thread(target=self._run_simulation, daemon=True)
             self.thread.start()
             print("start")
         self.stop_event.clear()
@@ -33,10 +35,15 @@ class Biospectrometer:
         self.stop_event.set()
 
     def get_current_data(self):
-        return self.current_index, self.data.loc[self.current_index]
+        with self.lock:
+            return self.current_index, self.data.loc[self.current_index]
 
     def jump_to(self, to_index):
-        print("jump to this index")
+        max_index = len(self.data) - 1
+        if to_index < 0 or to_index > max_index:
+            raise ValueError(f"index out of range min: 0 max: {max_index} ")
+        with self.lock:
+            self.current_index = to_index
 
 
 def read_csv_file():
@@ -48,22 +55,18 @@ def read_csv_file():
 
 def main():
     df = read_csv_file()
-    # print(df.shape)
-    # print(df.head())
-    print(df.head())
-    print(df.loc[3, 1002])
     bio_spectrometer = Biospectrometer(df)
     bio_spectrometer.start_simulation()
-    bio_spectrometer.stop_simulation()
-    print(bio_spectrometer.get_current_data())
     time.sleep(2)
-    print(bio_spectrometer.get_current_data())
-    time.sleep(3)
-    print(bio_spectrometer.get_current_data())
-    time.sleep(1)
-    print("START")
-    print(bio_spectrometer.start_simulation())
-    time.sleep(1)
+    bio_spectrometer.stop_simulation()
+    print("stop")
+    time.sleep(2)
+    bio_spectrometer.jump_to(22)
+    print(f"jump {bio_spectrometer.get_current_data()[0]}")
+    bio_spectrometer.start_simulation()
+    print("RESUMED")
+    time.sleep(2)
+    bio_spectrometer.get_current_data()
 
 
 if __name__ == "__main__":
