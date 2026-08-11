@@ -1,6 +1,14 @@
 import Plotly from "plotly.js-dist-min";
 import { client } from "./client";
 
+document.querySelector("#start-btn")!.addEventListener("click", async () => {
+  await client.POST("/start");
+});
+
+document.querySelector("#stop-btn")!.addEventListener("click", async () => {
+  await client.POST("/stop");
+});
+
 async function main() {
   const { data, error } = await client.GET("/spectrum");
   if (error || !data) {
