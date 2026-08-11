@@ -10,3 +10,4 @@ __pycache__/
 # Editor/OS cruft
 .DS_Store
 .vscode/
+node_modules/
