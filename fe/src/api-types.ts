@@ -98,6 +98,15 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** SpectrumResponse */
+        SpectrumResponse: {
+            /** Index */
+            index: number;
+            /** Wavenumbers */
+            wavenumbers: number[];
+            /** Data */
+            data: number[];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -226,7 +235,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SpectrumResponse"];
                 };
             };
         };
