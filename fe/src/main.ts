@@ -26,10 +26,10 @@ async function renderSpectrumData() {
     return;
   }
 
-  const trace = { y: data?.data, type: "scatter" };
+  const trace = { x: data?.wavenumbers, y: data?.data, type: "scatter" };
   const layout = {
-    xaxis: { title: "Index (0-N)" },
-    yaxis: { title: "Abs", range: [-0.001, 0.08] },
+    xaxis: { title: "Wavenumber (cm)" },
+    yaxis: { title: "Absorbance [mAU]", range: [-0.002, 0.085] },
   };
 
   if (!plotted) {
