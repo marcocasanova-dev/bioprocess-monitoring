@@ -20,7 +20,6 @@ class Biospectrometer:
             while self.stop_event.is_set():
                 time.sleep(0.1)
             time.sleep(0.5)
-            print(f"start_simulation INDEX --> {self.current_index}")
             with self.lock:
                 self.current_index = (self.current_index + 1) % len(self.data)
 
@@ -28,7 +27,6 @@ class Biospectrometer:
         if self.thread is None:
             self.thread = threading.Thread(target=self._run_simulation, daemon=True)
             self.thread.start()
-            print("start")
         self.stop_event.clear()
 
     def stop_simulation(self):

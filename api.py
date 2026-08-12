@@ -6,6 +6,8 @@ from biospectrometer import Biospectrometer, read_csv_file
 
 from fastapi.middleware.cors import CORSMiddleware
 
+from pydantic import BaseModel
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -49,7 +51,17 @@ def jump(index: int):
     return {"status": "jumping"}
 
 
+class SpectrumResponse(BaseModel):
+    index: int
+    wavenumbers: list[int]
+    data: list[float]
+
+
 @app.get("/spectrum")
-def get_spectrum():
+def get_spectrum() -> SpectrumResponse:
     index, current_data = app.state.spectrometer.get_current_data()
-    return {"status": "running", "index": index, "data": current_data.tolist()}
+    return SpectrumResponse(
+        index=index,
+        wavenumbers=current_data.index.tolist(),
+        data=current_data.tolist(),
+    )
