@@ -32,6 +32,9 @@ class Biospectrometer:
     def stop_simulation(self):
         self.stop_event.set()
 
+    def is_running(self):
+        return self.thread is not None and not self.stop_event.is_set()
+
     def get_current_data(self):
         with self.lock:
             return self.current_index, self.data.loc[self.current_index]
@@ -44,8 +47,8 @@ class Biospectrometer:
             self.current_index = to_index
 
 
-def read_csv_file():
-    csv_file_path = Path(__file__).parent / "data" / "spectra.csv"
+def read_csv_file(device_id: str = "monipa-01"):
+    csv_file_path = Path(__file__).parent / "data" / f"{device_id}.csv"
     df = pd.read_csv(csv_file_path, index_col=0)
     df.columns = df.columns.astype(int)
     return df

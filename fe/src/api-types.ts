@@ -21,68 +21,153 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/start": {
+    "/monipas": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        /** Start */
-        post: operations["start_start_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/stop": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Stop */
-        post: operations["stop_stop_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/jump/{index}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Jump */
-        post: operations["jump_jump__index__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/spectrum": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Spectrum */
-        get: operations["get_spectrum_spectrum_get"];
+        /** List Monipas */
+        get: operations["list_monipas_monipas_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monipas/spectrum": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Online Spectra
+         * @description Current spectrum for every online device — feeds a fleet-wide overlay chart.
+         */
+        get: operations["list_online_spectra_monipas_spectrum_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monipas/{monipa_id}/spectrum": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Monipa Spectrum */
+        get: operations["get_monipa_spectrum_monipas__monipa_id__spectrum_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monipas/{monipa_id}/trend/{wavenumber}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Monipa Trend
+         * @description One wavenumber's absorbance across the whole run — the process view.
+         *
+         *     /spectrum returns a single reading: one frame. This returns the same column
+         *     for every reading in the CSV, which is what actually answers "is this still
+         *     climbing or has it levelled off?".
+         */
+        get: operations["get_monipa_trend_monipas__monipa_id__trend__wavenumber__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monipas/{monipa_id}/heatmap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Monipa Heatmap
+         * @description The whole run as one grid: every reading × every wavenumber.
+         *
+         *     `stride` thins the wavenumber axis — 800 columns is far more than the chart
+         *     has pixels, so sending every 4th keeps the picture identical at a quarter of
+         *     the payload. Absorbances are rounded to 6 decimals for the same reason.
+         */
+        get: operations["get_monipa_heatmap_monipas__monipa_id__heatmap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monipas/{monipa_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Monipa */
+        post: operations["start_monipa_monipas__monipa_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monipas/{monipa_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop Monipa */
+        post: operations["stop_monipa_monipas__monipa_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monipas/{monipa_id}/jump/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Jump Monipa */
+        post: operations["jump_monipa_monipas__monipa_id__jump__index__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -98,6 +183,43 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HeatmapResponse */
+        HeatmapResponse: {
+            /** Wavenumbers */
+            wavenumbers: number[];
+            /** Values */
+            values: number[][];
+            /** Total */
+            total: number;
+        };
+        /** MonipaInfo */
+        MonipaInfo: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Online */
+            online: boolean;
+            /** Running */
+            running: boolean;
+            /** Index */
+            index: number;
+        };
+        /** MonipaSpectrum */
+        MonipaSpectrum: {
+            /** Index */
+            index: number;
+            /** Wavenumbers */
+            wavenumbers: number[];
+            /** Data */
+            data: number[];
+            /** Running */
+            running: boolean;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
         /** SpectrumResponse */
         SpectrumResponse: {
             /** Index */
@@ -106,6 +228,19 @@ export interface components {
             wavenumbers: number[];
             /** Data */
             data: number[];
+            /** Running */
+            running: boolean;
+        };
+        /** TrendResponse */
+        TrendResponse: {
+            /** Wavenumber */
+            wavenumber: number;
+            /** Values */
+            values: number[];
+            /** Current Index */
+            current_index: number;
+            /** Total */
+            total: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -149,7 +284,7 @@ export interface operations {
             };
         };
     };
-    start_start_post: {
+    list_monipas_monipas_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -164,12 +299,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MonipaInfo"][];
                 };
             };
         };
     };
-    stop_stop_post: {
+    list_online_spectra_monipas_spectrum_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -184,17 +319,113 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MonipaSpectrum"][];
                 };
             };
         };
     };
-    jump_jump__index__post: {
+    get_monipa_spectrum_monipas__monipa_id__spectrum_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                index: number;
+                monipa_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpectrumResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_monipa_trend_monipas__monipa_id__trend__wavenumber__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                monipa_id: string;
+                wavenumber: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_monipa_heatmap_monipas__monipa_id__heatmap_get: {
+        parameters: {
+            query?: {
+                stride?: number;
+            };
+            header?: never;
+            path: {
+                monipa_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeatmapResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_monipa_monipas__monipa_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                monipa_id: string;
             };
             cookie?: never;
         };
@@ -220,11 +451,13 @@ export interface operations {
             };
         };
     };
-    get_spectrum_spectrum_get: {
+    stop_monipa_monipas__monipa_id__stop_post: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                monipa_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -235,7 +468,48 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SpectrumResponse"];
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    jump_monipa_monipas__monipa_id__jump__index__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                monipa_id: string;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
