@@ -23,6 +23,12 @@ const BASE_LAYOUT = {
   paper_bgcolor: "transparent",
   plot_bgcolor: "transparent",
   font: { color: "#c8ccd4" },
+  // Without this, Plotly only registers a click within a pixel or two of the
+  // line itself — a "lines"-only trace with 800 points has no markers to
+  // widen that hit area. "x" makes it hit-test the whole vertical slice at
+  // the cursor's wavenumber instead, so a click anywhere near the curve
+  // (not just dead-on) picks the nearest point on it.
+  hovermode: "x" as const,
 };
 
 /**

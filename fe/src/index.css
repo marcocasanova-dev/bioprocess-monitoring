@@ -60,6 +60,7 @@ body {
 }
 
 .fleet-chip {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -73,6 +74,18 @@ body {
   font-size: 0.75rem;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+/* Mirrors the Trend panel's threshold status for the selected device only —
+   the others aren't polled for a value to compare, so they never show one. */
+.fleet-threshold-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--panel);
 }
 
 .fleet-chip:hover {
@@ -203,6 +216,70 @@ body {
 
 .trend-plot {
   min-height: 200px;
+}
+
+.threshold-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin: -0.2rem 0 0.4rem;
+}
+
+.threshold-current {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.threshold-current b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.threshold-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.threshold-field input {
+  width: 5.5rem;
+  background: #14161a;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.25rem 0.45rem;
+  font-size: 0.8rem;
+}
+
+.threshold-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.threshold-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.threshold-in-range {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+}
+
+.threshold-below {
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 18%, transparent);
+}
+
+.threshold-above {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 18%, transparent);
 }
 
 .scrubber {
