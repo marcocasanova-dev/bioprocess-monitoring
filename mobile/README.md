@@ -11,6 +11,8 @@ charting library).
 ```
 mobile/
   App.tsx                        entry screen — owns the selected device id
+  scripts/
+    set-api-url.sh                writes the Mac's current LAN IP into .env (runs before start/ios/android)
   src/
     config.ts                    backend base URL (see below)
     client.ts                    openapi-fetch client
@@ -51,38 +53,50 @@ for the web preview, iOS Simulator, or Android Emulator:
 - Android Emulator → `http://10.0.2.2:8000` (the emulator's alias for the host's localhost)
 
 For a **physical device** via Expo Go, `localhost` means the phone itself —
-it needs your Mac's actual LAN address instead.
+it needs your Mac's actual LAN address instead. That address changes every
+time the Mac joins a different Wi-Fi network, which used to mean editing
+`mobile/.env` by hand before every demo.
 
-### Running on a real Android device (same Wi-Fi)
+### The IP is now handled automatically
+
+`npm start` / `npm run ios` / `npm run android` all run
+[`scripts/set-api-url.sh`](scripts/set-api-url.sh) first (wired in as
+`pre*` scripts in `package.json`), which detects the Mac's current LAN IP
+(`ipconfig getifaddr en0`, falling back to `en1`) and rewrites
+`EXPO_PUBLIC_API_URL` in `mobile/.env` to match — every time, no manual step.
+Run it by itself any time with:
+
+```
+npm run set-ip
+```
+
+It only touches that one line in `.env` and leaves everything else there
+untouched. If it can't find a LAN IP (Wi-Fi is off, or you're on Ethernet
+only) it prints a warning and leaves `.env` as-is rather than writing a bad
+value — simulators/emulators don't need this at all, since they use
+`localhost`/`10.0.2.2` regardless.
+
+### Running on a real device (same Wi-Fi)
 
 1. **Bind the backend to all interfaces**, not just loopback — from the
    project root:
    ```
    uvicorn api:app --reload --host 0.0.0.0
    ```
-2. **Find your Mac's LAN IP**:
-   ```
-   ipconfig getifaddr en0
-   ```
-   (`en0` is usually Wi-Fi; if that prints nothing try `en1`, or read it
-   from System Settings → Wi-Fi → Details → TCP/IP.)
-3. **Allow the connection through the Mac firewall**, if it's on: System
+2. **Allow the connection through the Mac firewall**, if it's on: System
    Settings → Network → Firewall. The first incoming connection normally
    triggers an "Allow incoming connections for python?" prompt — accept it.
-4. **Point the app at that IP** — create `mobile/.env`:
-   ```
-   EXPO_PUBLIC_API_URL=http://<your-mac-lan-ip>:8000
-   ```
-5. **Sanity-check reachability before touching the app**: open
-   `http://<your-mac-lan-ip>:8000/health` in the Android phone's browser.
+3. From `mobile/`, run `npm start` — this refreshes `.env` with the current
+   IP automatically (see above), then starts Metro.
+4. **Sanity-check reachability before touching the app**: open
+   `http://<the-ip-npm-start-printed>:8000/health` in the phone's browser.
    If that doesn't load, it's a network/firewall issue, not the app —
    fix that first. The most common culprit is the phone and Mac being on
    different Wi-Fi networks (e.g. a guest network with "client/AP
    isolation" enabled, which blocks device-to-device traffic even though
    both show the same SSID).
-6. **Install Expo Go** from the Play Store on the Android phone.
-7. From `mobile/`, run `npm start` (plain Metro, not `--web`) and scan the
-   QR code it prints with the Expo Go app.
+5. **Install Expo Go** (App Store / Play Store) and scan the QR code
+   `npm start` prints.
 
 If the phone genuinely can't reach the Mac directly on that network (step 5
 fails and isn't a firewall issue), `npx expo start --tunnel` will get the

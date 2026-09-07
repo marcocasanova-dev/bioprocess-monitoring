@@ -19,8 +19,12 @@
     "typescript": "~5.9.2"
   },
   "scripts": {
+    "set-ip": "bash scripts/set-api-url.sh",
+    "prestart": "npm run set-ip",
     "start": "expo start",
+    "preandroid": "npm run set-ip",
     "android": "expo start --android",
+    "preios": "npm run set-ip",
     "ios": "expo start --ios",
     "web": "expo start --web"
   },

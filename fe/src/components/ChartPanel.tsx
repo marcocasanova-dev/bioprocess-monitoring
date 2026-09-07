@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
- /import Plotly from "plotly.js-dist-min";
+import Plotly from "plotly.js-dist-min";
 import type { SpectrumResponse } from "../hooks/useSpectrum";
 import { useFleetSpectrum } from "../hooks/useFleetSpectrum";
 import { useHeatmap } from "../hooks/useHeatmap";

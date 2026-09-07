@@ -34,6 +34,10 @@ curl http://127.0.0.1:8000/monipas/monipa-01/spectrum
 
 curl http://127.0.0.1:8000/monipas/spectrum   # every ONLINE device's current spectrum, for an overlay chart
 
+curl http://127.0.0.1:8000/monipas/monipa-01/trend/1650   # one wavenumber's absorbance across the whole run
+
+curl http://127.0.0.1:8000/monipas/monipa-01/heatmap   # every reading × every wavenumber, thinned by `stride` (default 4)
+
 Starting/stopping/jumping an offline device (`monipa-05`, `monipa-06`)
 returns `409` — it's not reachable, so it can't be controlled.
 
@@ -49,6 +53,19 @@ A row of chips above the split lets you pick which of the 6 fleet devices
 you're looking at — online ones show Idle/Running/Paused, offline ones are
 greyed out and read-only (their last known spectrum is still shown, but
 Start/Pause/Stop are disabled).
+
+The spectrum panel has three switchable views:
+  - **This device** — the current spectrum, polled every 500ms (the original view)
+  - **Compare all online** — every online device's current spectrum overlaid,
+    the selected one highlighted (`GET /monipas/spectrum`)
+  - **All readings** — a heatmap of the whole run so far (reading × wavenumber,
+    color = absorbance), drawn only up to the current index since a real
+    instrument can't show a reading it hasn't taken yet (`GET /monipas/{id}/heatmap`)
+
+Clicking any point on the spectrum picks the wavenumber a second chart below
+follows across the entire run — a kinetic trace, the same idea as a single-wavelength
+HPLC chromatogram (`GET /monipas/{id}/trend/{wavenumber}`). A slider under it
+scrubs through the run via `POST /monipas/{id}/jump/{index}`.
 
 ## How to run
 
@@ -70,13 +87,16 @@ TypeScript types in `src/api-types.ts`, one source of truth to rule them all
 
 ## Part III the mobile UI (mobile/)
 
-npx expo start --tunnel
+cd mobile
+npm start
 
 
 an Expo (React Native) dashboard covering the same data as fe/ — a scrollable
 row of the 6 fleet devices, spectrum chart, device status, Start/Pause/Stop —
 for a phone screen. See mobile/README.md for how to run it and how to point
-it at the backend from a simulator/emulator/physical device.
+it at the backend from a simulator/emulator/physical device — `npm start`
+auto-refreshes `mobile/.env` with this Mac's current LAN IP first (only
+matters for a physical device via Expo Go; simulators/emulators ignore it).
 
 ## Notes 
     - yaxis: { title: "Absorbance [mAU]", range: [-0.002, 0.09] }, range was harcoded after getting max/min across all 6 fleet devices, this could be better handled in the be
@@ -99,13 +119,16 @@ it at the backend from a simulator/emulator/physical device.
       doesn't apply to them regardless.
 
 ## Nice to have with more time 
-    - tests
-    - type hints 
-    - loading state / error messages in the front end
-    - fleet-wide overlay chart (all online devices on one chart — GET
-      /monipas/spectrum already returns the data for it, just not wired into
-      either UI yet)
+    - loading state / error messages in the mobile UI (the web app has them;
+      mobile's useFleet fetch error isn't surfaced in App.tsx yet)
     - derive a real calibrated value (e.g. titer) from the spectrum instead
-      of just plotting raw absorbance
+      of just plotting raw absorbance — deliberately not attempted: that's
+      chemometrics, a different problem from what this project does (surfacing
+      signal shape, not interpreting it)
     - basic anomaly flagging: compare each online device's spectrum to the
       fleet average
+    - a real diafiltration phase in the sample data — what's there is a single
+      ultrafiltration ramp (protein rising monotonically), not the full
+      UF1 → DF → UF2 sequence
+    - audit trail, calibration-model versioning, threshold alerts by process
+      stage — the gap between this and a regulated PAT product
