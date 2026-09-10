@@ -1,7 +1,9 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { RoundedBox, Text } from "@react-three/drei";
-import type { Group, Mesh, MeshStandardMaterial } from "three";
+import { ExtrudeGeometry, Shape } from "three";
+import { toCreasedNormals } from "three-stdlib";
+import type { BufferGeometry, Group, Mesh, MeshStandardMaterial } from "three";
 import type { SimStatus } from "../hooks/useSimulation";
 
 const LED_COLOR: Record<SimStatus, string> = {
@@ -31,6 +33,82 @@ const OLD_DEPTH = 1.15;
 const WIDTH_RATIO = BODY_WIDTH / OLD_WIDTH;
 const DEPTH_RATIO = BODY_DEPTH / OLD_DEPTH;
 
+/**
+ * Builds the housing as ONE real mesh instead of separate boxes bridged by a
+ * loose panel — that composite approach kept desyncing into a visible gap
+ * whenever the proportions changed, because three independent primitives all
+ * had to land on the exact same seam by coincidence, not by construction.
+ *
+ * This draws a rounded pentagon in the (Z, Y) plane — a rectangle with the
+ * top-front corner replaced by a straight cut — and extrudes it along X
+ * (width). Same technique @react-three/drei's own RoundedBox uses internally
+ * (Shape + ExtrudeGeometry + toCreasedNormals), just with 5 rounded corners
+ * instead of 4. Verified against the real Three.js output before wiring it
+ * in here: bounding box and both seam-corner positions checked in Node.
+ */
+function buildBeveledHousing(halfD: number, halfH: number, bevelH: number, bevelD: number, width: number): BufferGeometry {
+  const cornerRadius = 0.08;
+
+  // Corners, anticlockwise from bottom-back, in a local (u, v) frame where
+  // u stands in for Z and v for Y — rotated into the real X/Y/Z axes below.
+  const corners: [number, number][] = [
+    [-halfD, -halfH], // bottom-back
+    [halfD, -halfH], // bottom-front
+    [halfD, halfH - bevelH], // front-seam — front face meets the bevel
+    [halfD - bevelD, halfH], // top-seam — bevel meets the top face
+    [-halfD, halfH], // top-back
+  ];
+
+  const shape = new Shape();
+  const n = corners.length;
+  const unit = (ax: number, ay: number, bx: number, by: number) => {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len = Math.hypot(dx, dy);
+    return [dx / len, dy / len];
+  };
+  let firstPoint: [number, number] | null = null;
+  for (let i = 0; i < n; i++) {
+    const [px, py] = corners[(i - 1 + n) % n];
+    const [cx, cy] = corners[i];
+    const [nx, ny] = corners[(i + 1) % n];
+    const [inX, inY] = unit(px, py, cx, cy);
+    const [outX, outY] = unit(cx, cy, nx, ny);
+    const startX = cx - inX * cornerRadius;
+    const startY = cy - inY * cornerRadius;
+    const endX = cx + outX * cornerRadius;
+    const endY = cy + outY * cornerRadius;
+    if (i === 0) {
+      shape.moveTo(startX, startY);
+      firstPoint = [startX, startY];
+    } else {
+      shape.lineTo(startX, startY);
+    }
+    // A quadratic curve through the real corner rounds it off without needing
+    // per-corner arc-angle bookkeeping — much harder to get a sign wrong than
+    // absarc's start/end angles, at the cost of a slightly less exact circle.
+    shape.quadraticCurveTo(cx, cy, endX, endY);
+  }
+  if (firstPoint) shape.lineTo(firstPoint[0], firstPoint[1]);
+
+  // No bevelEnabled here: Three.js's extrude bevel expands the shape OUTWARD
+  // by bevelSize at the two end caps (that's what the option is for) — since
+  // this shape is already built at its true final size, turning that on
+  // double-counts the radius and overshoots (verified: 2.06 instead of the
+  // intended 1.9 before this was caught). The 5 corners are already rounded
+  // above; skipping the cap bevel just leaves the two far side-faces meeting
+  // the body with a sharp, not rounded, seam — minor, not silhouette-defining.
+  const geometry = new ExtrudeGeometry(shape, { depth: width, bevelEnabled: false, steps: 1, curveSegments: 8 });
+  geometry.center();
+  toCreasedNormals(geometry, 0.4);
+  // Local X (the shape's u, i.e. Z) → world Z; local Z (the extrude, i.e.
+  // width) → world X. A -90° Y-rotation maps (x,y,z) -> (-z,y,x): world Z
+  // keeps the sign built into the corners above (front stays front), and
+  // width flipping sign is harmless — the cross-section doesn't vary along it.
+  geometry.rotateY(-Math.PI / 2);
+  return geometry;
+}
+
 /** A stylized, procedural stand-in for the Monipa spectrometer housing. */
 export function MonipaDevice({ status }: { status: SimStatus }) {
   const groupRef = useRef<Group>(null);
@@ -52,21 +130,10 @@ export function MonipaDevice({ status }: { status: SimStatus }) {
   const halfH = BODY_HEIGHT / 2;
   const halfD = BODY_DEPTH / 2;
 
-  // The beveled edge: the top-front edge, replaced by one flat panel instead
-  // of the rounded corner — solved so its two ends land exactly on the box's
-  // real surfaces, not eyeballed. BEVEL_H is how far down the front face the
-  // cut starts; BEVEL_D is how far back along the top face it recedes. Sized
-  // to be the dominant feature it is in the reference photo (~30% of the
-  // body's height), not a thin decorative accent — the first size (0.35) read
-  // as "a box with a line on it" rather than "a cut prism."
+  // Sized so the cut is the dominant feature it is in the reference photo
+  // (~30% of the body's height), not a thin decorative accent.
   const BEVEL_H = 0.6; // unchanged — height ratio is 1, the body's height didn't change
   const BEVEL_D = 0.4 * DEPTH_RATIO; // scales up: the real body is much deeper
-  const BEVEL_LENGTH = Math.hypot(BEVEL_H, BEVEL_D); // panel's own height, exactly spans the cut
-  const BEVEL_ANGLE = Math.atan2(-BEVEL_D, BEVEL_H); // tilts local Y to point from the front-seam to the top-seam
-  const BEVEL_NORMAL = { y: BEVEL_D / BEVEL_LENGTH, z: BEVEL_H / BEVEL_LENGTH }; // the panel's outward face direction
-  const BEVEL_NUDGE = 0.03; // pushed proud along that normal so it doesn't clip the rounded corner underneath
-  const BEVEL_CENTER_Y = halfH - BEVEL_H / 2 + BEVEL_NORMAL.y * BEVEL_NUDGE;
-  const BEVEL_CENTER_Z = halfD - BEVEL_D / 2 + BEVEL_NORMAL.z * BEVEL_NUDGE;
   const BEVEL_BOTTOM_SEAM_Y = halfH - BEVEL_H; // where the bevel meets the flat front — everything below is the non-beveled part
 
   // The bigger bevel eats further down the front, so every control shifts
@@ -75,62 +142,16 @@ export function MonipaDevice({ status }: { status: SimStatus }) {
   const CONTROLS_Y = BEVEL_BOTTOM_SEAM_Y - 0.08;
   const CONTROLS_SHIFT = CONTROLS_Y - 0.52; // 0.52 was the original branding row's y
 
-  // The housing is split into two real volumes, not one uniform box with a
-  // panel glued on top — that was the actual bug: a decal doesn't change the
-  // silhouette, so it kept reading as "a cube" no matter how big it got.
-  //   BACK_BOX:  full height, shallower depth (stops short of the true front)
-  //   FRONT_BOX: full depth, shorter height (stops below the true top)
-  // The two share the exact seam the bevel panel above already bridges — feed
-  // it the same BEVEL_H / BEVEL_D and the notch and the panel always line up.
-  const BACK_BOX_DEPTH = BODY_DEPTH - BEVEL_D;
-  const BACK_BOX_Z = -BEVEL_D / 2;
-  const FRONT_BOX_HEIGHT = BODY_HEIGHT - BEVEL_H;
-  const FRONT_BOX_Y = -BEVEL_H / 2;
+  const housingGeometry = useMemo(
+    () => buildBeveledHousing(halfD, halfH, BEVEL_H, BEVEL_D, BODY_WIDTH),
+    [halfD, halfH, BEVEL_H, BEVEL_D],
+  );
 
   return (
     <group ref={groupRef} position={[0, 0, 0]}>
-      {/* Back volume — full height, cut short in depth */}
-      <RoundedBox
-        args={[BODY_WIDTH, BODY_HEIGHT, BACK_BOX_DEPTH]}
-        radius={0.14}
-        smoothness={4}
-        position={[0, 0, BACK_BOX_Z]}
-        castShadow
-        receiveShadow
-      >
+      <mesh geometry={housingGeometry} castShadow receiveShadow>
         <meshStandardMaterial color="#e3e6ea" metalness={0.55} roughness={0.35} />
-      </RoundedBox>
-
-      {/* Front volume — full depth, cut short in height. Overlaps the back
-          volume where both exist; the two together make the actual notched
-          silhouette, not just a texture on a plain box. */}
-      <RoundedBox
-        args={[BODY_WIDTH, FRONT_BOX_HEIGHT, BODY_DEPTH]}
-        radius={0.14}
-        smoothness={4}
-        position={[0, FRONT_BOX_Y, 0]}
-        castShadow
-        receiveShadow
-      >
-        <meshStandardMaterial color="#e3e6ea" metalness={0.55} roughness={0.35} />
-      </RoundedBox>
-
-      {/* Beveled top-front edge — see BEVEL_* above for how this is solved to
-          meet the box's real surfaces at both ends instead of floating.
-          radius must stay well under half the panel's own thickness (0.05):
-          drei's RoundedBox computes extrudeDepth = thickness - radius*2, so a
-          radius >= thickness/2 goes negative and the geometry collapses —
-          that's what was rendering as a thin line instead of a flat panel. */}
-      <RoundedBox
-        args={[BODY_WIDTH * 0.85, BEVEL_LENGTH, 0.05]}
-        radius={0.012}
-        smoothness={4}
-        position={[0, BEVEL_CENTER_Y, BEVEL_CENTER_Z]}
-        rotation={[BEVEL_ANGLE, 0, 0]}
-        castShadow
-      >
-        <meshStandardMaterial color="#eef1f3" metalness={0.4} roughness={0.55} />
-      </RoundedBox>
+      </mesh>
 
       {/* Front face branding — on the flat, non-beveled part of the body.
           X offsets scaled by WIDTH_RATIO: the front is much narrower now
