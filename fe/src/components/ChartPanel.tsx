@@ -74,6 +74,39 @@ export function ChartPanel({
   const { heatmap, error: heatmapError } = useHeatmap(deviceId, view === "heatmap");
   const currentIndex = spectrum?.index ?? 0;
 
+  // Animates the heatmap's scan bar from the previous row to the new one
+  // instead of snapping, so a new row's reveal reads as a sweep rather than a
+  // jump cut. Capped just under the 500ms spectrum poll interval so one sweep
+  // always finishes before the next index arrives.
+  const SCAN_DURATION_MS = 450;
+  const [scanIndex, setScanIndex] = useState(currentIndex);
+  const scanFrom = useRef(currentIndex);
+
+  useEffect(() => {
+    if (view !== "heatmap") {
+      scanFrom.current = currentIndex;
+      setScanIndex(currentIndex);
+      return;
+    }
+    const from = scanFrom.current;
+    const to = currentIndex;
+    if (from === to) return;
+
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / SCAN_DURATION_MS);
+      setScanIndex(from + (to - from) * t);
+      if (t < 1) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        scanFrom.current = to;
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [currentIndex, view]);
+
   // Colour limits come from the whole run, not from the rows drawn so far —
   // otherwise every new reading rescales the ramp and the early, near-flat part
   // of the run gets painted as if it were full of signal.
@@ -134,14 +167,15 @@ export function ChartPanel({
         showlegend: false,
         shapes: [
           selectionShape,
-          // Where the live reading currently sits in the run.
+          // Where the live reading currently sits in the run — sweeps from the
+          // previous row to this one instead of snapping (see scanIndex above).
           {
             type: "line" as const,
             xref: "paper" as const,
             x0: 0,
             x1: 1,
-            y0: currentIndex,
-            y1: currentIndex,
+            y0: scanIndex,
+            y1: scanIndex,
             line: { color: "#f9a84f", width: 1, dash: "dot" as const },
           },
         ],
@@ -175,7 +209,7 @@ export function ChartPanel({
     } else {
       Plotly.react(node, traces, layout);
     }
-  }, [view, fleetSpectra, heatmap, heatRange, spectrum, deviceId, deviceName, selectedWavenumber, currentIndex]);
+  }, [view, fleetSpectra, heatmap, heatRange, spectrum, deviceId, deviceName, selectedWavenumber, currentIndex, scanIndex]);
 
   // Clicking a point picks the wavenumber the trend chart follows. Waits for
   // plotReady — before newPlot the div has no .on to attach to; Plotly.react

@@ -5,11 +5,23 @@ import { ExtrudeGeometry, Shape } from "three";
 import { toCreasedNormals } from "three-stdlib";
 import type { BufferGeometry, Group, Mesh, MeshStandardMaterial } from "three";
 import type { SimStatus } from "../hooks/useSimulation";
+import type { ThresholdStatus } from "../hooks/useThreshold";
 
 const LED_COLOR: Record<SimStatus, string> = {
   idle: "#4a4d54",
   paused: "#f5c518",
   running: "#35d07f",
+};
+
+// Which of the traffic light's three lamps is lit for a given threshold
+// status — "below" lights the amber lamp (floor crossed), "above" the red one
+// (ceiling crossed), "in-range" the green one; "unset" leaves all three dim
+// since no range has been typed in yet.
+const TRAFFIC_LIT: Record<ThresholdStatus, "below" | "in-range" | "above" | null> = {
+  below: "below",
+  "in-range": "in-range",
+  above: "above",
+  unset: null,
 };
 
 // Real Monipa proportions: 40cm wide × 80cm tall × 80cm deep — narrower and
@@ -109,8 +121,156 @@ function buildBeveledHousing(halfD: number, halfH: number, bevelH: number, bevel
   return geometry;
 }
 
+/**
+ * A standalone 3-lamp traffic light standing next to the housing, showing
+ * whether the live reading is below/within/above the user's typed threshold
+ * range (see useThreshold). Purely a readout — it never affects the sim.
+ */
+function TrafficLight({ status, x, z }: { status: ThresholdStatus; x: number; z: number }) {
+  const lit = TRAFFIC_LIT[status];
+  const LAMPS: { key: "above" | "in-range" | "below"; y: number; color: string }[] = [
+    { key: "above", y: 0.28, color: "#ef5350" },
+    { key: "in-range", y: 0, color: "#35d07f" },
+    { key: "below", y: -0.28, color: "#f5c518" },
+  ];
+
+  return (
+    <group position={[x, -0.5, z]}>
+      {/* Pole */}
+      <mesh position={[0, -0.35, 0]} castShadow>
+        <cylinderGeometry args={[0.025, 0.03, 0.7, 12]} />
+        <meshStandardMaterial color="#3a3d42" metalness={0.4} roughness={0.5} />
+      </mesh>
+      {/* Housing box holding the three lamps */}
+      <RoundedBox args={[0.22, 0.62, 0.14]} radius={0.02} smoothness={4} position={[0, 0.04, 0]} castShadow>
+        <meshStandardMaterial color="#2a2d33" metalness={0.3} roughness={0.6} />
+      </RoundedBox>
+      {LAMPS.map(({ key, y, color }) => {
+        const on = lit === key;
+        return (
+          <mesh key={key} position={[0, y, 0.09]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.07, 0.07, 0.03, 24]} />
+            <meshStandardMaterial
+              color={color}
+              emissive={color}
+              emissiveIntensity={on ? 1.6 : 0.05}
+              transparent
+              opacity={on ? 1 : 0.35}
+            />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+/**
+ * Simplified stand-ins for what actually sits inside the housing, laid out
+ * for the transparent "see inside" mode: the Arduino controller board near
+ * the top (it drives everything else), the spectrometer module below it
+ * facing the sample port, and the pump/tubing hardware already modelled for
+ * the exterior view reused at the bottom. Not a faithful internal layout —
+ * just enough distinct, labeled blocks to navigate and identify.
+ */
+function InternalComponents({ halfW, halfH, halfD }: { halfW: number; halfH: number; halfD: number }) {
+  return (
+    <group>
+      {/* Arduino board — green PCB near the top of the housing */}
+      <group position={[0, halfH - 0.35, 0]}>
+        <RoundedBox args={[halfW * 1.1, 0.03, halfD * 0.55]} radius={0.008} smoothness={2} castShadow>
+          <meshStandardMaterial color="#1e5e3a" metalness={0.1} roughness={0.7} />
+        </RoundedBox>
+        {/* USB / header block */}
+        <mesh position={[-halfW * 0.4, 0.05, -halfD * 0.15]}>
+          <boxGeometry args={[0.12, 0.06, 0.1]} />
+          <meshStandardMaterial color="#c0c0c0" metalness={0.6} roughness={0.4} />
+        </mesh>
+        {/* Header pins along the front edge */}
+        {Array.from({ length: 8 }).map((_, i) => (
+          <mesh key={i} position={[-halfW * 0.45 + i * 0.05, 0.03, halfD * 0.22]}>
+            <boxGeometry args={[0.012, 0.03, 0.012]} />
+            <meshStandardMaterial color="#111" metalness={0.5} roughness={0.5} />
+          </mesh>
+        ))}
+        {/* Microcontroller chip */}
+        <mesh position={[halfW * 0.2, 0.035, 0]}>
+          <boxGeometry args={[0.12, 0.02, 0.12]} />
+          <meshStandardMaterial color="#0c0c0c" metalness={0.3} roughness={0.5} />
+        </mesh>
+        <Text
+          position={[0, 0.05, halfD * 0.3]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={0.05}
+          color="#8fe3b0"
+          anchorX="center"
+          anchorY="middle"
+        >
+          Arduino
+        </Text>
+      </group>
+
+      {/* Spectrometer module — a dark optical block in the mid-section,
+          facing the front port where the sample light path exits. */}
+      <group position={[0, halfH * 0.15, halfD * 0.1]}>
+        <RoundedBox args={[halfW * 0.9, 0.32, halfD * 0.5]} radius={0.02} smoothness={4} castShadow>
+          <meshStandardMaterial color="#15171b" metalness={0.6} roughness={0.3} />
+        </RoundedBox>
+        {/* Diffraction grating / lens glint on the front face */}
+        <mesh position={[0, 0, halfD * 0.25 + 0.005]}>
+          <circleGeometry args={[0.06, 24]} />
+          <meshStandardMaterial color="#4c8dff" emissive="#4c8dff" emissiveIntensity={0.4} metalness={0.8} roughness={0.15} />
+        </mesh>
+        <Text
+          position={[0, 0, -halfD * 0.26 - 0.005]}
+          rotation={[0, Math.PI, 0]}
+          fontSize={0.045}
+          color="#7ea8ff"
+          anchorX="center"
+          anchorY="middle"
+        >
+          Spectrometer
+        </Text>
+      </group>
+
+      {/* Wiring between Arduino and spectrometer */}
+      <mesh position={[halfW * 0.3, halfH * 0.6, halfD * 0.05]}>
+        <cylinderGeometry args={[0.006, 0.006, halfH * 0.5, 8]} />
+        <meshStandardMaterial color="#e0b23c" metalness={0.2} roughness={0.5} />
+      </mesh>
+
+      {/* Power/battery pack near the bottom */}
+      <group position={[0, -halfH * 0.55, -halfD * 0.15]}>
+        <RoundedBox args={[halfW * 0.7, 0.22, halfD * 0.35]} radius={0.015} smoothness={4} castShadow>
+          <meshStandardMaterial color="#2a2e36" metalness={0.4} roughness={0.5} />
+        </RoundedBox>
+        <Text
+          position={[0, 0, halfD * 0.18 + 0.005]}
+          fontSize={0.04}
+          color="#9aa0ab"
+          anchorX="center"
+          anchorY="middle"
+        >
+          Power
+        </Text>
+      </group>
+    </group>
+  );
+}
+
+type MonipaDeviceProps = {
+  status: SimStatus;
+  showTrafficLight?: boolean;
+  thresholdStatus?: ThresholdStatus;
+  transparent?: boolean;
+};
+
 /** A stylized, procedural stand-in for the Monipa spectrometer housing. */
-export function MonipaDevice({ status }: { status: SimStatus }) {
+export function MonipaDevice({
+  status,
+  showTrafficLight = false,
+  thresholdStatus = "unset",
+  transparent = false,
+}: MonipaDeviceProps) {
   const groupRef = useRef<Group>(null);
   const rotorRef = useRef<Mesh>(null);
   const ledRef = useRef<MeshStandardMaterial>(null);
@@ -149,9 +309,30 @@ export function MonipaDevice({ status }: { status: SimStatus }) {
 
   return (
     <group ref={groupRef} position={[0, 0, 0]}>
-      <mesh geometry={housingGeometry} castShadow receiveShadow>
-        <meshStandardMaterial color="#e3e6ea" metalness={0.55} roughness={0.35} />
+      <mesh geometry={housingGeometry} castShadow={!transparent} receiveShadow={!transparent}>
+        {transparent ? (
+          <meshStandardMaterial
+            color="#4c8dff"
+            metalness={0.1}
+            roughness={0.4}
+            transparent
+            opacity={0.12}
+            wireframe={false}
+            depthWrite={false}
+            side={2}
+          />
+        ) : (
+          <meshStandardMaterial color="#e3e6ea" metalness={0.55} roughness={0.35} />
+        )}
       </mesh>
+      {/* Wireframe overlay on top of the translucent shell — reads as "glass
+          with visible edges" rather than a flat see-through blob. */}
+      {transparent && (
+        <mesh geometry={housingGeometry}>
+          <meshBasicMaterial color="#7ea8ff" wireframe transparent opacity={0.35} />
+        </mesh>
+      )}
+      {transparent && <InternalComponents halfW={halfW} halfH={halfH} halfD={halfD} />}
 
       {/* Front face branding — on the flat, non-beveled part of the body.
           X offsets scaled by WIDTH_RATIO: the front is much narrower now
@@ -231,6 +412,8 @@ export function MonipaDevice({ status }: { status: SimStatus }) {
       >
         IRUBIS
       </Text>
+
+      {showTrafficLight && <TrafficLight status={thresholdStatus} x={halfW + 0.35} z={0} />}
     </group>
   );
 }

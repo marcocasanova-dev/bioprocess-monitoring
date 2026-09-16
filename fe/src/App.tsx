@@ -45,7 +45,13 @@ export function App() {
           selectedWavenumber={wavenumber}
           onSelectWavenumber={setWavenumber}
         />
-        <DevicePanel key={selectedId} deviceId={selectedId} spectrum={spectrum} online={online} />
+        <DevicePanel
+          key={selectedId}
+          deviceId={selectedId}
+          spectrum={spectrum}
+          online={online}
+          thresholdStatus={thresholdStatus}
+        />
       </main>
       <div className="trend-row">
         <TrendPanel

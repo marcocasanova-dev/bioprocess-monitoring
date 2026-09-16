@@ -395,3 +395,164 @@ body {
   background: color-mix(in srgb, var(--red) 22%, #23262d);
   border-color: color-mix(in srgb, var(--red) 45%, var(--panel-border));
 }
+
+.addons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+}
+
+.addons-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addons-toggle input,
+.addons-option input {
+  accent-color: var(--accent);
+}
+
+.addons-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-left: 0.2rem;
+}
+
+.addons-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.btn-diagnostics {
+  align-self: flex-start;
+  background: color-mix(in srgb, var(--accent) 20%, #23262d);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--panel-border));
+  flex: none;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 11, 14, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  max-width: 32rem;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.2rem;
+}
+
+.modal-close:hover {
+  color: var(--text);
+}
+
+.diagnostics-running {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.diagnostics-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.diagnostics-section h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.diagnostics-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.log-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+
+.log-level {
+  flex: none;
+  width: 3.6rem;
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
+
+.log-ok .log-level {
+  color: var(--green);
+}
+
+.log-info .log-level {
+  color: var(--accent);
+}
+
+.log-warn .log-level {
+  color: var(--amber);
+}
+
+.log-error .log-level {
+  color: var(--red);
+}
+
+.log-message {
+  color: var(--text);
+}

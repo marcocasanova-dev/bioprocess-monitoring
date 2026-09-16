@@ -65,10 +65,14 @@ export function TrendPanel({ deviceId, wavenumber, currentIndex, online, onStatu
     const node = plotRef.current;
     if (!node || !trend) return;
 
+    // Only what's been measured so far — same rule as the heatmap: a real
+    // instrument can't show you readings it hasn't taken yet.
+    const measured = trend.values.slice(0, shownIndex + 1);
+
     const traces = [
       {
-        x: trend.values.map((_, i) => i),
-        y: trend.values,
+        x: measured.map((_, i) => i),
+        y: measured,
         type: "scatter" as const,
         mode: "lines" as const,
         line: { width: 2, color: "#4f9cf9" },
@@ -117,7 +121,14 @@ export function TrendPanel({ deviceId, wavenumber, currentIndex, online, onStatu
       });
     }
 
-    const layout = { ...BASE_LAYOUT, shapes };
+    const layout = {
+      ...BASE_LAYOUT,
+      // Fixed to the full run so the measured part grows into a stable frame
+      // instead of the x-axis rescaling to fit each new point (same reasoning
+      // as the heatmap's fixed y-axis).
+      xaxis: { ...BASE_LAYOUT.xaxis, range: [0, trend.total - 1] },
+      shapes,
+    };
 
     if (!plotted.current) {
       Plotly.newPlot(node, traces, layout, { responsive: true, displaylogo: false });
