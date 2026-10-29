@@ -3,9 +3,11 @@ import { Canvas } from "@react-three/fiber";
 import { ContactShadows, Environment, OrbitControls } from "@react-three/drei";
 import { MonipaDevice } from "./MonipaDevice";
 import { DiagnosticsModal } from "./DiagnosticsModal";
+import { DebugLogPanel } from "./DebugLogPanel";
 import { deriveStatus, useSimulationActions, type SimStatus } from "../hooks/useSimulation";
 import type { SpectrumResponse } from "../hooks/useSpectrum";
 import type { ThresholdStatus } from "../hooks/useThreshold";
+import type { DebugEvent } from "../hooks/useDebugLog";
 
 const STATUS_LABEL: Record<SimStatus, string> = {
   idle: "Idle",
@@ -18,15 +20,19 @@ type Props = {
   spectrum: SpectrumResponse | null;
   online: boolean;
   thresholdStatus: ThresholdStatus;
+  debugEvents: DebugEvent[];
+  onClearDebugLog: () => void;
 };
 
-export function DevicePanel({ deviceId, spectrum, online, thresholdStatus }: Props) {
+export function DevicePanel({ deviceId, spectrum, online, thresholdStatus, debugEvents, onClearDebugLog }: Props) {
   const status = deriveStatus(spectrum);
   const { busy, error, start, pause, stop } = useSimulationActions(deviceId);
   const [addonsOpen, setAddonsOpen] = useState(false);
   const [showTrafficLight, setShowTrafficLight] = useState(false);
   const [showInternals, setShowInternals] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [debugLogOpen, setDebugLogOpen] = useState(false);
+  const unreadErrors = debugEvents.filter((e) => e.level === "error").length;
 
   return (
     <section className="panel device-panel">
@@ -93,6 +99,15 @@ export function DevicePanel({ deviceId, spectrum, online, thresholdStatus }: Pro
             </button>
           </div>
         )}
+      </div>
+
+      <div className="addons">
+        <label className="addons-toggle">
+          <input type="checkbox" checked={debugLogOpen} onChange={(e) => setDebugLogOpen(e.target.checked)} />
+          <span>Debug Log</span>
+          {unreadErrors > 0 && <span className="debug-log-badge">{unreadErrors}</span>}
+        </label>
+        {debugLogOpen && <DebugLogPanel events={debugEvents} onClear={onClearDebugLog} />}
       </div>
 
       <div className="controls">

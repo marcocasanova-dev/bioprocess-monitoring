@@ -1,17 +1,10 @@
-import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RoundedBox, Text } from "@react-three/drei";
 import { ExtrudeGeometry, Shape } from "three";
 import { toCreasedNormals } from "three-stdlib";
-import type { BufferGeometry, Group, Mesh, MeshStandardMaterial } from "three";
+import type { BufferGeometry, Group } from "three";
 import type { SimStatus } from "../hooks/useSimulation";
 import type { ThresholdStatus } from "../hooks/useThreshold";
-
-const LED_COLOR: Record<SimStatus, string> = {
-  idle: "#4a4d54",
-  paused: "#f5c518",
-  running: "#35d07f",
-};
 
 // Which of the traffic light's three lamps is lit for a given threshold
 // status — "below" lights the amber lamp (floor crossed), "above" the red one
@@ -22,6 +15,21 @@ const TRAFFIC_LIT: Record<ThresholdStatus, "below" | "in-range" | "above" | null
   "in-range": "in-range",
   above: "above",
   unset: null,
+};
+
+// Light green flash shown for the first second after the sim starts
+// running — a boot self-check, before the LED settles into the color below.
+const CASSETTE_LED_BOOT_COLOR = "#8ef2b0";
+
+// Cassette LED color by threshold status once the boot flash ends — light
+// green with no range set (nothing to evaluate yet, matches the boot color
+// since there's no different steady state to settle into), amber below the
+// user's minimum, dark green in range, red over the maximum.
+const CASSETTE_LED_COLOR: Record<ThresholdStatus, string> = {
+  unset: CASSETTE_LED_BOOT_COLOR,
+  below: "#f5c518",
+  "in-range": "#1f8a4c",
+  above: "#ef5350",
 };
 
 // Real Monipa proportions: 40cm wide × 80cm tall × 80cm deep — narrower and
@@ -118,6 +126,44 @@ function buildBeveledHousing(halfD: number, halfH: number, bevelH: number, bevel
   // keeps the sign built into the corners above (front stays front), and
   // width flipping sign is harmless — the cross-section doesn't vary along it.
   geometry.rotateY(-Math.PI / 2);
+  return geometry;
+}
+
+/**
+ * The pump cassette's body: only the diamond silhouette's right half,
+ * extruded and then rotated 90° about its flat seam edge so the extrusion
+ * runs front-to-back instead of sideways — the seam edge (the former cut
+ * line) ends up flat and flush against the backplate, and the rest of the
+ * shape juts forward as a facet wedge. The left half is dropped entirely
+ * (not merged back in) — the flat rectangular back is provided separately
+ * by the mounting plate this sits on, not by rebuilding the other half.
+ */
+function buildCassetteGeometry(): BufferGeometry {
+  const depth = 0.13;
+
+  const wedgeShape = new Shape();
+  wedgeShape.moveTo(0, 0.26);
+  wedgeShape.lineTo(0.1, 0.22);
+  wedgeShape.lineTo(0.17, 0.1);
+  wedgeShape.lineTo(0.15, -0.08);
+  wedgeShape.lineTo(0.09, -0.24);
+  wedgeShape.lineTo(0, -0.27);
+  wedgeShape.closePath();
+
+  const geometry = new ExtrudeGeometry(wedgeShape, { depth, bevelEnabled: false, steps: 1, curveSegments: 1 });
+  // Rotate about the seam (x=0, the straight edge above) so the extrusion
+  // direction swings from sideways to forward — the seam face stays flat
+  // and becomes the back of the cassette, flush against the backplate. The
+  // sign matters: -90° (not +90°) maps the wedge's tip (originally at +X)
+  // to +Z, i.e. outward/toward the camera, instead of backward into the
+  // housing.
+  geometry.rotateY(-Math.PI / 2);
+  // Center on all three axes: the shape's own Y range (-0.27..0.26) and the
+  // extrude depth that became local X after the rotation both need
+  // re-centering, and .center() (unlike a hand-picked translate) always
+  // lands exactly on the geometry's true bounding-box middle.
+  geometry.center();
+  toCreasedNormals(geometry, 0.5);
   return geometry;
 }
 
@@ -272,19 +318,21 @@ export function MonipaDevice({
   transparent = false,
 }: MonipaDeviceProps) {
   const groupRef = useRef<Group>(null);
-  const rotorRef = useRef<Mesh>(null);
-  const ledRef = useRef<MeshStandardMaterial>(null);
 
-  useFrame((state, delta) => {
-    if (status === "running" && rotorRef.current) {
-      rotorRef.current.rotation.z += delta * 4;
+  // Cassette LED boot flash: every time the sim transitions into "running",
+  // the LED reads light green for a second (a self-check flash) before
+  // settling into whatever the threshold status actually says.
+  const [booting, setBooting] = useState(false);
+  const prevStatusRef = useRef<SimStatus>(status);
+  useEffect(() => {
+    if (status === "running" && prevStatusRef.current !== "running") {
+      setBooting(true);
+      const timer = setTimeout(() => setBooting(false), 1000);
+      prevStatusRef.current = status;
+      return () => clearTimeout(timer);
     }
-    if (ledRef.current) {
-      const target =
-        status === "running" ? 1.4 + Math.sin(state.clock.elapsedTime * 4) * 0.5 : status === "paused" ? 0.8 : 0.15;
-      ledRef.current.emissiveIntensity += (target - ledRef.current.emissiveIntensity) * 0.15;
-    }
-  });
+    prevStatusRef.current = status;
+  }, [status]);
 
   const halfW = BODY_WIDTH / 2;
   const halfH = BODY_HEIGHT / 2;
@@ -306,24 +354,25 @@ export function MonipaDevice({
     () => buildBeveledHousing(halfD, halfH, BEVEL_H, BEVEL_D, BODY_WIDTH),
     [halfD, halfH, BEVEL_H, BEVEL_D],
   );
+  const cassetteGeometry = useMemo(() => buildCassetteGeometry(), []);
 
   return (
     <group ref={groupRef} position={[0, 0, 0]}>
       <mesh geometry={housingGeometry} castShadow={!transparent} receiveShadow={!transparent}>
-        {transparent ? (
-          <meshStandardMaterial
-            color="#4c8dff"
-            metalness={0.1}
-            roughness={0.4}
-            transparent
-            opacity={0.12}
-            wireframe={false}
-            depthWrite={false}
-            side={2}
-          />
-        ) : (
-          <meshStandardMaterial color="#e3e6ea" metalness={0.55} roughness={0.35} />
-        )}
+        {/* One material element whose props switch by value, not two swapped
+            elements — swapping JSX children of the same mesh between renders
+            left three.js's material state (transparent/opacity/depthWrite)
+            stuck from whichever branch rendered last, so toggling "off" left
+            the housing invisible instead of back to solid. */}
+        <meshStandardMaterial
+          color={transparent ? "#4c8dff" : "#e3e6ea"}
+          metalness={transparent ? 0.1 : 0.55}
+          roughness={transparent ? 0.4 : 0.35}
+          transparent={transparent}
+          opacity={transparent ? 0.12 : 1}
+          depthWrite={!transparent}
+          side={2}
+        />
       </mesh>
       {/* Wireframe overlay on top of the translucent shell — reads as "glass
           with visible edges" rather than a flat see-through blob. */}
@@ -339,7 +388,7 @@ export function MonipaDevice({
           (0.95 vs the old 1.6), so keeping the raw offsets would have pushed
           the LED half off the edge instead of staying proportionally placed. */}
       <Text
-        position={[-halfW + 0.44 * WIDTH_RATIO, CONTROLS_Y, halfD + 0.006]}
+        position={[-halfW + 0.44 * WIDTH_RATIO, CONTROLS_Y - 0.02, halfD + 0.006]}
         fontSize={0.13 * WIDTH_RATIO}
         color="#2b2e33"
         anchorX="center"
@@ -348,53 +397,62 @@ export function MonipaDevice({
         Monipa
       </Text>
 
-      {/* Status LED */}
-      <mesh position={[-halfW + 0.76 * WIDTH_RATIO, CONTROLS_Y, halfD + 0.01]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.045, 0.045, 0.02, 24]} />
-        <meshStandardMaterial
-          ref={ledRef}
-          color={LED_COLOR[status]}
-          emissive={LED_COLOR[status]}
-          emissiveIntensity={0.15}
-        />
-      </mesh>
+      {/* Peristaltic pump assembly — a vertical metal backplate bolted to the
+          front face, with the translucent faceted cassette clipped onto it
+          and a single green status LED near the top. */}
+      <group position={[0.08, -0.18 + CONTROLS_SHIFT + 0.03, halfD + 0.02]} scale={0.8}>
+        {/* Metal backplate */}
+        <RoundedBox args={[0.3, 0.9, 0.03]} radius={0.02} smoothness={4} castShadow>
+          <meshStandardMaterial color="#d5d8dd" metalness={0.6} roughness={0.35} />
+        </RoundedBox>
 
-      {/* Peristaltic pump bezel */}
-      <RoundedBox
-        args={[0.46, 0.66, 0.08]}
-        radius={0.025}
-        smoothness={4}
-        position={[0, -0.18 + CONTROLS_SHIFT, halfD + 0.02]}
-        castShadow
-      >
-        <meshStandardMaterial color="#cfd3d8" metalness={0.3} roughness={0.5} />
-      </RoundedBox>
+        {/* Single status LED strip near the top of the backplate — light
+            green for a second right after start (boot self-check), then
+            light green with no range set, amber below the minimum, dark
+            green in range, red above the maximum (same signal as the
+            traffic light addon, just read at a glance without turning it
+            on). */}
+        <mesh position={[0, 0.36, 0.019]}>
+          <boxGeometry args={[0.14, 0.04, 0.008]} />
+          <meshStandardMaterial
+            color={booting ? CASSETTE_LED_BOOT_COLOR : CASSETTE_LED_COLOR[thresholdStatus]}
+            emissive={booting ? CASSETTE_LED_BOOT_COLOR : CASSETTE_LED_COLOR[thresholdStatus]}
+            emissiveIntensity={0.9}
+          />
+        </mesh>
 
-      {/* Pump head */}
-      <mesh position={[0, -0.18 + CONTROLS_SHIFT, halfD + 0.09]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.17, 0.17, 0.05, 32]} />
-        <meshStandardMaterial color="#dfe6ea" metalness={0.2} roughness={0.3} transparent opacity={0.85} />
-      </mesh>
+        {/* Bottom rail the cassette seats against */}
+        <mesh position={[0, -0.4, 0.025]}>
+          <boxGeometry args={[0.24, 0.06, 0.04]} />
+          <meshStandardMaterial color="#c3c7cd" metalness={0.5} roughness={0.4} />
+        </mesh>
 
-      {/* Spinning rotor (only visibly spins while running) */}
-      <mesh ref={rotorRef} position={[0, -0.18 + CONTROLS_SHIFT, halfD + 0.125]}>
-        <boxGeometry args={[0.24, 0.045, 0.02]} />
-        <meshStandardMaterial color="#3a3d42" metalness={0.4} roughness={0.4} />
-      </mesh>
+        {/* Cassette body — only the wedge half of the diamond profile (see
+            buildCassetteGeometry): its flat seam face sits right at this
+            group's local z=0, flush against the backplate, and the facet
+            wedge projects forward from there. No mirrored other half. */}
+        <group position={[0, 0, 0.02]}>
+          <mesh geometry={cassetteGeometry} castShadow>
+            <meshStandardMaterial
+              color="#9aa5c9"
+              metalness={0.1}
+              roughness={0.15}
+              transparent
+              opacity={0.55}
+              side={2}
+            />
+          </mesh>
+        </group>
+      </group>
 
-      {/* Tubing loop feeding the pump */}
-      <mesh position={[0, 0.14 + CONTROLS_SHIFT, halfD - 0.03]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.15, 0.018, 12, 32]} />
-        <meshStandardMaterial color="#cfe0ea" metalness={0.1} roughness={0.2} transparent opacity={0.55} />
-      </mesh>
-
-      {/* Black port / knob */}
+      {/* Black port / knob — flatter (shorter z-depth) and slightly smaller
+          radius per feedback, closer to the reference photo's flush cap. */}
       <mesh
-        position={[-halfW + 0.46 * WIDTH_RATIO, -halfH + 0.5 + CONTROLS_SHIFT, halfD + 0.03]}
+        position={[-halfW + 0.46 * WIDTH_RATIO, -halfH + 0.5 + CONTROLS_SHIFT, halfD + 0.02]}
         rotation={[Math.PI / 2, 0, 0]}
         castShadow
       >
-        <cylinderGeometry args={[0.14, 0.14, 0.1, 32]} />
+        <cylinderGeometry args={[0.09, 0.09, 0.04, 32]} />
         <meshStandardMaterial color="#17181a" metalness={0.3} roughness={0.6} />
       </mesh>
 

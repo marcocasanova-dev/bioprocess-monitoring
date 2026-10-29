@@ -98,6 +98,60 @@ it at the backend from a simulator/emulator/physical device — `npm start`
 auto-refreshes `mobile/.env` with this Mac's current LAN IP first (only
 matters for a physical device via Expo Go; simulators/emulators ignore it).
 
+## 11-Minute Demo Walkthrough
+
+A script for presenting this project end to end, roughly 11 minutes. Each
+section names what to click and why it earns a place in the demo — not just
+what it does.
+
+1. **Opening** (0:00) — This builds on the original coding challenge; everything
+   from here on is a layer added on top of it.
+2. **The fleet** (0:40) — Six simulated Monipa devices across the top row, four
+   online and two offline. A customer has a plant, not one instrument.
+3. **Spectrum — this device** (1:05) — The current spectrum for one device,
+   polled every 500ms. A snapshot: it answers "what does the signal look like
+   right now," nothing about trend.
+4. **Compare all online** (2:05) — All four online devices' spectra overlaid,
+   the selected one highlighted. Fleet-level outlier detection — a device can
+   look fine alone but be off relative to its peers.
+5. **All readings** (3:15) — The whole run as a heatmap (reading × wavenumber),
+   painted only up to the current index — a real instrument can't show a
+   reading it hasn't taken. A scan line sweeps across as each new row lands,
+   paced to the same 500ms poll so the reveal never runs ahead of what's
+   actually been measured.
+6. **Trend & threshold** (4:45) — Click any point on the spectrum to see how
+   it evolved across the whole run (same idea as a single-wavelength HPLC
+   chromatogram). Typing a min/max turns the marker green, amber, or red —
+   the system compares against a range the user defines, it doesn't decide
+   what's correct.
+7. **The 3D model & addons** (6:15) — The model mirrors live state, plus three
+   optional overlays in the Addons panel: a physical-looking traffic light
+   (same threshold signal, readable from across a room), a "see inside" mode
+   that makes the housing transparent to show the controller board,
+   spectrometer module, and pump inside, and a diagnostics check across
+   connectivity/power/controller/optics/threshold.
+8. **Debug log** (8:15) — A running log, separate from the diagnostics
+   snapshot, that accumulates events as they actually happen during a run —
+   dropped polls/connectivity loss and threshold crossings — timestamped and
+   categorized (hardware/software/data). Empty until something occurs; not a
+   heartbeat feed.
+9. **Mobile** (9:20) — The same backend and data, rethought for a phone
+   screen — monitoring shouldn't require standing in front of a laptop.
+
+Closing line: *"Every view answers a question the others can't — and none of
+them claims to know more about the chemistry than it actually does."*
+
+### What's next (named, not built)
+
+Ideas worth mentioning if the conversation goes there — framed as "where I'd
+take this," not a committed roadmap:
+  - **Fleet health ranking** — sort the six devices by time spent out of range
+    or offline, so attention goes to whichever needs it most.
+  - **Run export & annotations** — download a run as CSV; let a user mark an
+    event directly on the Trend chart as a persistent, timestamped note.
+  - **Saved run profiles** — presets bundling pump speed, default wavenumber,
+    and threshold range by experiment type.
+
 ## Notes 
     - yaxis: { title: "Absorbance [mAU]", range: [-0.002, 0.09] }, range was harcoded after getting max/min across all 6 fleet devices, this could be better handled in the be
     - frontend types are generated for conviniece and mantain one source of true
